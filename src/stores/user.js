@@ -1,4 +1,3 @@
-// src/stores/user.js
 import { defineStore } from "pinia";
 import axios from "../utils/axios";
 
@@ -26,7 +25,22 @@ export const useUserStore = defineStore("user", {
     async logout() {
       try {
         const refreshToken = localStorage.getItem("refresh_token");
-        await axios.post("/api/user/logout/", { refresh: refreshToken });
+        if (refreshToken) {
+          await axios
+            .post("/api/user/logout/", { refresh: refreshToken })
+            .catch((error) => {
+              // 忽略黑名单错误
+              if (
+                error.response?.data?.error?.includes("Token is blacklisted")
+              ) {
+                return; // 黑名单错误直接忽略
+              }
+              throw error; // 其他错误继续抛出
+            });
+        }
+      } catch (error) {
+        // 记录非黑名单错误（调试用）
+        console.error("注销失败:", error);
       } finally {
         localStorage.removeItem("access_token");
         localStorage.removeItem("refresh_token");

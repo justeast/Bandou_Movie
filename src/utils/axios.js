@@ -30,7 +30,7 @@ instance.interceptors.request.use((config) => {
   return config;
 });
 
-// 响应拦截器：统一处理 401
+// 响应拦截器：统一处理 401(access_token 过期)
 instance.interceptors.response.use(
   (response) => response,
   async (error) => {
@@ -76,7 +76,13 @@ instance.interceptors.response.use(
           );
 
           const newAccessToken = res.data.access;
-          localStorage.setItem("access_token", newAccessToken);
+          const newRefreshToken = res.data.refresh;
+          if (newAccessToken) {
+            localStorage.setItem("access_token", newAccessToken);
+          }
+          if (newRefreshToken) {
+            localStorage.setItem("refresh_token", newRefreshToken);
+          }
 
           isRefreshing = false;
           onRefreshed(newAccessToken); // 通知所有等待的请求

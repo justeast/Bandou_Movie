@@ -239,8 +239,10 @@ const handleLogout = async () => {
     message.success('注销成功', 3)
     router.push('/')
   } catch (error) {
-    message.error('注销失败', 3)
-    console.log(error)
+    // 忽略黑名单错误
+    if (!error.response?.data?.error?.includes("Token is blacklisted")) {
+      message.error("注销失败", 3);
+    }
   }
 }
 

@@ -152,6 +152,6 @@ REST_FRAMEWORK = {
 SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(minutes=60),
     'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
-    'ROTATE_REFRESH_TOKENS': True,
-    'BLACKLIST_AFTER_ROTATION': True,
+    'ROTATE_REFRESH_TOKENS': True,  # 每次使用 refresh_token 刷新 access_token 时，旧的 refresh_token 会被废弃，并生成一个新的 refresh_token
+    'BLACKLIST_AFTER_ROTATION': True,  # 旧的 refresh_token 在旋转后会被自动列入黑名单
 }

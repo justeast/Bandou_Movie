@@ -21,7 +21,8 @@ from django.urls import path, include
 from bandou.views import proxy_bouban_movie_image, UserRegisterView, UserLoginView, UserLogoutView, UserProfileView, \
     UserAvatarUploadView, UserPasswordChangeView, MovieRankingView, UserRatingListCreateView, \
     MovieRatingListView, MovieRatingStatsView, UserCommentListCreateView, MovieCommentListView, \
-    CurrentUserRatingView, CommentDeleteView, CommentReplyView, MovieRecommendationView
+    CurrentUserRatingView, CommentDeleteView, CommentReplyView, MovieRecommendationView, PasswordResetRequestView, \
+    PasswordResetConfirmView
 
 from rest_framework_simplejwt.views import (
     TokenObtainPairView,
@@ -39,6 +40,8 @@ urlpatterns = [
                   path("api/user/profile/", UserProfileView.as_view()),  # 用户个人中心
                   path("api/user/avatar/", UserAvatarUploadView.as_view()),  # 用户头像上传
                   path("api/user/change_password/", UserPasswordChangeView.as_view()),  # 用户修改密码
+                  path('api/user/reset_password/request/', PasswordResetRequestView.as_view()),  # 用户密码重置请求
+                  path('api/user/reset_password/confirm/', PasswordResetConfirmView.as_view()),  # 用户密码重置确认
                   path('api/token/', TokenObtainPairView.as_view()),  # 用户认证
                   path('api/token/refresh/', TokenRefreshView.as_view()),  # 用户认证
                   path('api/user/ratings/', UserRatingListCreateView.as_view()),  # todo："我评分过的电影"

@@ -155,3 +155,20 @@ SIMPLE_JWT = {
     'ROTATE_REFRESH_TOKENS': True,  # 每次使用 refresh_token 刷新 access_token 时，旧的 refresh_token 会被废弃，并生成一个新的 refresh_token
     'BLACKLIST_AFTER_ROTATION': True,  # 旧的 refresh_token 在旋转后会被自动列入黑名单
 }
+
+# 邮件相关配置
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST = 'smtp.qq.com'  # QQ邮箱SMTP服务器
+EMAIL_PORT = 587  # TLS端口
+EMAIL_USE_TLS = True  # 启用TLS加密
+EMAIL_HOST_USER = 'qinyingdong@qq.com'  # QQ邮箱
+EMAIL_HOST_PASSWORD = 'aydvlqbknzmagdhc'  # 邮箱的授权码
+DEFAULT_FROM_EMAIL = 'Bandou <qinyingdong@qq.com>'  # 默认发件人
+
+# redis相关配置
+REDIS_CONFIG = {
+    'host': '127.0.0.1',
+    'port': 6379,
+    'password': '123456',
+    'decode_responses': True
+}

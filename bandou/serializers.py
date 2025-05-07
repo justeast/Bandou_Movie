@@ -1,10 +1,14 @@
+from datetime import timedelta
+
 from rest_framework import serializers
+from django.contrib.auth import get_user_model
 from django.contrib.auth.hashers import make_password
 from django.core.exceptions import ValidationError
 from django.utils.translation import gettext_lazy
 from django.utils import timezone
 import os
 import time
+from bandou.utils.get_redis_instance import get_redis_instance
 from bandou.models import Movie, User, Rating, Comments
 
 
@@ -151,6 +155,52 @@ class UserPasswordChangeSerializer(serializers.Serializer):
         """用户输入新密码一致性校验"""
         if attrs['new_password'] != attrs['confirm_password']:
             raise ValidationError('两次输入的新密码不一致！')
+        return attrs
+
+
+class PasswordResetRequestSerializer(serializers.Serializer):
+    """密码重置请求序列化器"""
+    email = serializers.EmailField(required=True)
+
+    def validate_email(self, value):  # noqa
+        User = get_user_model()
+        if not User.objects.filter(email=value).exists():
+            raise serializers.ValidationError('该邮箱未注册')
+        return value
+
+
+class PasswordResetConfirmSerializer(serializers.Serializer):
+    """密码重置确认序列化器"""
+    email = serializers.EmailField(required=True)
+    code = serializers.CharField(required=True, max_length=6, min_length=6)
+    new_password = serializers.CharField(required=True, min_length=8)
+
+    def validate(self, attrs):
+        email = attrs['email']
+        code = attrs['code']
+        redis_client = get_redis_instance()
+        # 检查用户是否存在
+        User = get_user_model()
+        if not User.objects.filter(email=email).exists():
+            raise serializers.ValidationError({'email': '该邮箱未注册'})
+
+        # 从 Redis 获取验证码和生成时间
+        stored_code = redis_client.get(f"reset_code:{email}")
+        stored_timestamp = float(redis_client.get(f"reset_timestamp:{email}"))
+
+        if not stored_code or not stored_timestamp:
+            raise serializers.ValidationError({'code': '验证码无效或已过期'})
+
+        # 检查验证码是否匹配
+        if stored_code != code:
+            raise serializers.ValidationError({'code': '验证码错误'})
+
+        # 检查有效期（5分钟）
+        expiry_duration = timedelta(minutes=5)
+        current_time = timezone.now().timestamp()
+        if current_time - stored_timestamp > expiry_duration.total_seconds():
+            raise serializers.ValidationError({'code': '验证码已过期'})
+
         return attrs
 
 

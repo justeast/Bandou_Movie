@@ -1,5 +1,11 @@
+from datetime import timedelta
+
 import requests
+import random
 from django.http import HttpResponse
+from django.conf import settings
+from django.core.mail import send_mail
+from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 from django.shortcuts import get_object_or_404
 from rest_framework.views import APIView
@@ -12,11 +18,14 @@ from rest_framework.parsers import MultiPartParser
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.exceptions import TokenError
 from rest_framework.permissions import IsAuthenticated
-from django.contrib.auth import authenticate
+from django.contrib.auth import authenticate, get_user_model
+
+from bandou.utils.get_redis_instance import get_redis_instance
 from bandou.utils.user_auth import get_tokens_for_user
 from bandou.models import Movie, Rating, Comments
 from bandou.serializers import MovieModelSerializer, UserModelSerializer, UserLoginSerializer, UserProfileSerializer, \
-    UserAvatarUploadSerializer, UserPasswordChangeSerializer, RatingSerializer, CommentSerializer
+    UserAvatarUploadSerializer, UserPasswordChangeSerializer, RatingSerializer, CommentSerializer, \
+    PasswordResetRequestSerializer, PasswordResetConfirmSerializer
 
 """
 电影类别中英文映射
@@ -204,6 +213,69 @@ class UserPasswordChangeView(APIView):
         elif 'non_field_errors' in errors:
             return Response({'detail': errors['non_field_errors'][0]}, status=status.HTTP_400_BAD_REQUEST)
         return Response({'detail': '密码修改失败'}, status=status.HTTP_400_BAD_REQUEST)
+
+
+class PasswordResetRequestView(APIView):
+    def post(self, request):  # noqa
+        """密码重置请求"""
+        serializer = PasswordResetRequestSerializer(data=request.data)
+        if serializer.is_valid():
+            email = serializer.validated_data['email']
+            redis_client = get_redis_instance()
+            # 检查发送频率限制
+            last_sent = redis_client.get(f"reset_cooldown:{email}")
+            if last_sent and (timezone.now().timestamp() - float(last_sent)) < 60:
+                return Response(
+                    {'error': '请等待60秒后再试'},
+                    status=status.HTTP_429_TOO_MANY_REQUESTS
+                )
+
+            # 生成6位随机验证码
+            verification_code = str(random.randint(100000, 999999))
+
+            # 存储到 Redis，设置5分钟过期
+            redis_client.setex(f"reset_code:{email}", 300, verification_code)  # 300秒=5分钟
+            redis_client.setex(f"reset_timestamp:{email}", 300, timezone.now().timestamp())
+            redis_client.setex(f"reset_cooldown:{email}", 60, str(timezone.now().timestamp()))  # 设置60秒冷却
+            # 发送邮件验证码
+            subject = '密码重置验证码'
+            message = f'您的密码重置验证码是: {verification_code},有效期为5分钟,请尽快验证!'
+            send_mail(
+                subject,
+                message,
+                settings.DEFAULT_FROM_EMAIL,
+                [email],
+                fail_silently=False
+            )
+
+            return Response({
+                'message': '验证码已发送',
+                'code_expiry': str(timedelta(minutes=5))
+            }, status=status.HTTP_200_OK)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class PasswordResetConfirmView(APIView):
+    def post(self, request):  # noqa
+        """密码重置确认"""
+        serializer = PasswordResetConfirmSerializer(data=request.data)
+        if serializer.is_valid():
+            email = serializer.validated_data['email']
+            new_password = serializer.validated_data['new_password']
+
+            # 更新用户密码
+            User = get_user_model()
+            user = User.objects.get(email=email)
+            user.set_password(new_password)
+            user.save()
+
+            # 清理 Redis 中的验证码
+            redis_client = get_redis_instance()
+            redis_client.delete(f"reset_code:{email}")
+            redis_client.delete(f"reset_timestamp:{email}")
+
+            return Response({'message': '密码重置成功'}, status=status.HTTP_200_OK)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
 class CurrentUserRatingView(APIView):

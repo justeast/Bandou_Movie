@@ -58,6 +58,21 @@ Layout.vue:
       <!-- 登录模态框 -->
       <a-modal v-model:open="uiStore.showLoginModal" title="用户登录" :footer="null" :width="400">
         <login-form @success="handleLoginSuccess" />
+        <div style="text-align: center; margin-top: 16px;">
+          <a-button type="link" @click="showPasswordResetRequestModal">忘记密码？</a-button>
+        </div>
+      </a-modal>
+
+      <!-- 密码重置请求模态框 -->
+      <a-modal v-model:open="uiStore.showPasswordResetRequestModal" :destroyOnClose="true" title="密码重置请求" :footer="null"
+        :width="400">
+        <password-reset-request-form @success="handlePasswordResetRequestSuccess" />
+      </a-modal>
+
+      <!-- 密码重置确认模态框 -->
+      <a-modal v-model:open="uiStore.showPasswordResetConfirmModal" :destroyOnClose="true" title="密码重置确认" :footer="null"
+        :width="400">
+        <password-reset-confirm-form :email="uiStore.resetEmail" @success="handlePasswordResetConfirmSuccess" />
       </a-modal>
 
       <a-layout-content style="padding: 0 50px">
@@ -128,6 +143,8 @@ import avatarImg from '../assets/avatar.png';
 import { message } from 'ant-design-vue';
 import RegisterForm from "./RegisterForm.vue";
 import LoginForm from "./LoginForm.vue";
+import PasswordResetRequestForm from "./PasswordResetRequestForm.vue";
+import PasswordResetConfirmForm from "./PasswordResetConfirmForm.vue";
 import { emitter } from "../utils/eventBus";
 
 const route = useRoute()
@@ -245,6 +262,32 @@ const handleLogout = async () => {
     }
   }
 }
+
+// 显示密码重置请求模态框
+const showPasswordResetRequestModal = () => {
+  uiStore.showLoginModal = false;
+  uiStore.showPasswordResetRequestModal = true;
+};
+
+// 密码重置请求成功处理
+const handlePasswordResetRequestSuccess = (email) => {
+  uiStore.setResetEmail(email); // 存储邮箱
+  uiStore.showPasswordResetRequestModal = false;
+  // 延迟打开确认模态框，确保旧定时器清理
+  setTimeout(() => {
+    uiStore.showPasswordResetConfirmModal = true;
+  }, 300);
+  message.success('验证码已发送至您的邮箱', 3);
+};
+
+// 密码重置确认成功处理
+const handlePasswordResetConfirmSuccess = () => {
+  uiStore.showPasswordResetConfirmModal = false;
+  uiStore.showLoginModal = true;
+  uiStore.clearResetEmail();
+  uiStore.clearCodeExpiry();
+  message.success('密码重置成功，请重新登录', 3);
+};
 
 const movies = ref([])
 

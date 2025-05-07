@@ -83,6 +83,7 @@ import { useRouter, useRoute } from 'vue-router';
 import { CalendarOutlined, TagOutlined, QuestionCircleOutlined } from '@ant-design/icons-vue';
 import axios from '../utils/axios';
 import { message } from 'ant-design-vue';
+import DefaultMovieCover from '../assets/default-movie-cover.jpg'
 
 const router = useRouter();
 const route = useRoute()
@@ -94,36 +95,58 @@ const imageCache = ref({});
 
 const userStore = useUserStore();
 
-// 初始化时加载本地缓存
+// 默认图片路径
+const DEFAULT_IMAGE = DefaultMovieCover
+
+// 初始化图片缓存
 try {
-    const cache = localStorage.getItem("imageCache");
+    const cache = localStorage.getItem('imageCache');
     if (cache) imageCache.value = JSON.parse(cache);
 } catch (e) {
-    console.warn("Failed to load image cache:", e);
+    console.warn('无法加载图片缓存:', e);
 }
 
 // 图片缓存处理
 const cachedImage = (url) => {
-    if (!url) return '';
-    if (!imageCache.value[url]) {
-        const proxyUrl = `http://127.0.0.1:8000/proxy_image/?url=${encodeURIComponent(url)}`;
-        imageCache.value[url] = proxyUrl;
-        try {
-            localStorage.setItem("imageCache", JSON.stringify(imageCache.value));
-        } catch (e) {
-            console.warn("LocalStorage quota exceeded, clearing cache");
-            console.log(e);
-            localStorage.removeItem("imageCache");
-        }
+    if (!url) return DEFAULT_IMAGE; // 无 URL 时返回默认图片
+    if (imageCache.value[url]) return imageCache.value[url]; // 返回缓存的 URL
+
+    // 缓存代理 URL
+    const proxyUrl = `http://127.0.0.1:8000/proxy_image/?url=${encodeURIComponent(url)}`;
+    imageCache.value[url] = proxyUrl;
+
+    // 保存缓存到 localStorage
+    try {
+        localStorage.setItem('imageCache', JSON.stringify(imageCache.value));
+    } catch (e) {
+        console.warn('localStorage 空间不足，清空缓存');
+        localStorage.removeItem('imageCache');
+        console.log(e);
     }
-    return imageCache.value[url];
+
+    return proxyUrl;
 };
 
-// 图片加载失败处理
+// 处理图片加载失败
 const handleImageError = (e) => {
     const img = e.target;
-    img.src = '../assets/default-movie-cover.jpg';
-    img.onerror = null;
+    const originalUrl = decodeURIComponent(
+        img.src.split('url=')[1] || img.src
+    );
+
+    // 设置默认图片并更新缓存
+    imageCache.value[originalUrl] = DEFAULT_IMAGE;
+    img.src = DEFAULT_IMAGE;
+    img.onerror = null; // 清除错误事件，防止重复触发
+
+    // 更新 localStorage
+    try {
+        localStorage.setItem('imageCache', JSON.stringify(imageCache.value));
+    } catch (e) {
+        console.warn('localStorage 空间不足，清空缓存');
+        localStorage.removeItem('imageCache');
+        console.log(e);
+    }
 };
 
 // 日期格式化

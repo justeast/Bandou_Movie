@@ -1,5 +1,4 @@
 from datetime import timedelta
-
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
 from django.contrib.auth.hashers import make_password
@@ -8,8 +7,8 @@ from django.utils.translation import gettext_lazy
 from django.utils import timezone
 import os
 import time
-from bandou.utils.get_redis_instance import get_redis_instance
 from bandou.models import Movie, User, Rating, Comments
+from bandou.utils.get_redis_instance import get_redis_instance
 
 
 class MovieModelSerializer(serializers.ModelSerializer):
@@ -51,8 +50,14 @@ class UserModelSerializer(serializers.ModelSerializer):
 
 
 class UserLoginSerializer(serializers.Serializer):
-    username = serializers.CharField()
+    username = serializers.CharField(required=False)
+    email = serializers.EmailField(required=False)
     password = serializers.CharField()
+
+    def validate(self, attrs):
+        if not attrs.get('username') and not attrs.get('email'):
+            raise serializers.ValidationError('请提供用户名或邮箱！')
+        return attrs
 
 
 class UserProfileSerializer(serializers.ModelSerializer):

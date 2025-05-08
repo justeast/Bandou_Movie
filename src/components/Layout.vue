@@ -112,9 +112,15 @@ Layout.vue:
           </a-layout-sider>
           <a-layout-content :style="{ padding: '0 24px', minHeight: '600px' }" class="content-with-fixed-sider">
             <template v-if="$route.path === '/'">
+              <!-- 搜索栏 -->
+              <search-bar :get-movies-by-category="getMoviesByCategory"
+                :category="route.query.category?.toString() || 'all'" v-model:movies="movies" />
               <a-row :gutter="[16, 24]">
                 <a-col v-for="movie in movies" :key="movie.id" :span="6">
                   <movie-card :movie="movie"></movie-card>
+                </a-col>
+                <a-col v-if="!movies.length" :span="24" style="text-align: center; color: #999;">
+                  暂无电影
                 </a-col>
               </a-row>
             </template>
@@ -145,6 +151,7 @@ import RegisterForm from "./RegisterForm.vue";
 import LoginForm from "./LoginForm.vue";
 import PasswordResetRequestForm from "./PasswordResetRequestForm.vue";
 import PasswordResetConfirmForm from "./PasswordResetConfirmForm.vue";
+import SearchBar from "./SearchBar.vue";
 import { emitter } from "../utils/eventBus";
 
 const route = useRoute()

@@ -11,7 +11,7 @@ from rest_framework.views import APIView
 from rest_framework.viewsets import ModelViewSet
 from rest_framework.filters import SearchFilter, OrderingFilter
 from rest_framework.response import Response
-from django.db.models import Value, Case, When, FloatField, Avg, Count
+from django.db.models import Value, Case, When, FloatField, Avg, Count, Q
 from rest_framework import generics, status
 from rest_framework.parsers import MultiPartParser
 from rest_framework_simplejwt.tokens import RefreshToken
@@ -83,7 +83,29 @@ class MovieModelViewSet(ModelViewSet):
         return queryset
 
 
+class MovieSearchView(generics.ListAPIView):
+    """电影搜索"""
+    serializer_class = MovieModelSerializer
+
+    def get_queryset(self):
+        queryset = Movie.objects.all()
+        keyword = self.request.query_params.get('keyword', None)
+
+        if keyword:
+            queryset = queryset.filter(
+                Q(title__icontains=keyword) |
+                Q(brief_introduction__icontains=keyword) |
+                Q(director__icontains=keyword) |
+                Q(starring__icontains=keyword) |
+                Q(type__icontains=keyword)
+            )
+
+        # 按评分排序
+        return queryset.order_by('-score')
+
+
 class MovieRankingView(generics.ListAPIView):
+    """电影榜单"""
     queryset = Movie.objects.all()
     serializer_class = MovieModelSerializer
     filter_backends = [OrderingFilter]

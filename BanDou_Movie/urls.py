@@ -22,7 +22,7 @@ from bandou.views import proxy_bouban_movie_image, UserRegisterView, UserLoginVi
     UserAvatarUploadView, UserPasswordChangeView, MovieRankingView, UserRatingListCreateView, \
     MovieRatingListView, MovieRatingStatsView, UserCommentListCreateView, MovieCommentListView, \
     CurrentUserRatingView, CommentDeleteView, CommentReplyView, MovieRecommendationView, PasswordResetRequestView, \
-    PasswordResetConfirmView
+    PasswordResetConfirmView, MovieSearchView
 
 from rest_framework_simplejwt.views import (
     TokenObtainPairView,
@@ -34,6 +34,7 @@ urlpatterns = [
                   path("proxy_image/", proxy_bouban_movie_image),  # 获取电影图片
                   path("bandou/", include("bandou.urls")),  # 电影增删改查
                   path("movies/ranking/", MovieRankingView.as_view()),  # 电影榜单
+                  path('movies/search/', MovieSearchView.as_view()),  # 电影搜索
                   path("api/user/register/", UserRegisterView.as_view()),  # 用户注册
                   path("api/user/login/", UserLoginView.as_view()),  # 用户登录
                   path("api/user/logout/", UserLogoutView.as_view()),  # 用户注销

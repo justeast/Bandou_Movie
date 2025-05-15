@@ -21,12 +21,22 @@ function onRefreshed(newToken) {
   refreshSubscribers = [];
 }
 
+// 不需要认证的公共API路径（白名单）
+const publicPaths = ["/bandou/movies/", "/api/token/refresh/"];
+
+// 判断请求URL是否在公共路径白名单中
+function isPublicPath(url) {
+  return publicPaths.some((path) => url.includes(path));
+}
+
 // 请求拦截器: 附加Authorization
 instance.interceptors.request.use((config) => {
   const token = localStorage.getItem("access_token");
-  if (token) {
+  // 只有在token存在且不是公共路径时才添加Authorization头
+  if (token && !isPublicPath(config.url)) {
     config.headers.Authorization = `Bearer ${token}`;
   }
+
   return config;
 });
 
@@ -45,6 +55,14 @@ instance.interceptors.response.use(
     const response = error.response;
 
     if (response?.status === 401 && !originalRequest._retry) {
+      // 如果是公共路径，不需要刷新token，直接返回错误
+      if (isPublicPath(originalRequest.url)) {
+        console.warn(
+          `公共路径 ${originalRequest.url} 无需添加Token，但返回了401错误`
+        );
+        return Promise.reject(error);
+      }
+
       originalRequest._retry = true; // 标记这个请求已经尝试过了
 
       if (!isRefreshing) {

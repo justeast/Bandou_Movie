@@ -2,6 +2,12 @@ export const getErrorMessage = (error) => {
   const status = error.response?.status;
   const data = error.response?.data;
 
+  // 首先检查是否有错误信息，优先使用后端返回的error字段
+  if (data?.error) return data.error;
+
+  // 然后检查detail字段
+  if (data?.detail) return data.detail;
+
   if (data?.detail) return data.detail;
   if (status === 401) return "登录已过期，请重新登录";
   if (status === 403) return "权限不足";

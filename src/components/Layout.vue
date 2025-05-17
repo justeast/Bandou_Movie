@@ -58,8 +58,9 @@ Layout.vue:
       <!-- 登录模态框 -->
       <a-modal v-model:open="uiStore.showLoginModal" title="用户登录" :footer="null" :width="400">
         <login-form @success="handleLoginSuccess" />
-        <div style="text-align: center; margin-top: 16px;">
+        <div class="modal-footer">
           <a-button type="link" @click="showPasswordResetRequestModal">忘记密码？</a-button>
+          <a-button type="link" @click="goToAdmin">管理员登录</a-button>
         </div>
       </a-modal>
 
@@ -235,6 +236,11 @@ const instance = getCurrentInstance()
 instance.appContext.config.globalProperties.$showLoginModal = () => {
   uiStore.showLoginModal = true
 }
+
+// 跳转到Django Admin进行后台用户管理
+const goToAdmin = () => {
+  window.location.href = 'http://localhost:8000/admin';
+};
 
 // 注册成功处理
 const handleRegisterSuccess = () => {
@@ -494,5 +500,17 @@ onMounted(() => {
 .content-with-fixed-sider {
   margin-left: 200px;
   /* 侧边栏宽度 */
+}
+
+.modal-footer {
+  margin-top: 16px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 16px;
+}
+
+.modal-footer .ant-btn {
+  margin: 0;
 }
 </style>

@@ -10,6 +10,9 @@
                 <a-button type="link" @click="router.push('/')">
                     返回首页
                 </a-button>
+                <a-button type="link" @click="goToAdmin">
+                    管理员登录
+                </a-button>
             </div>
         </div>
         <!-- 密码重置请求模态框 -->
@@ -38,6 +41,11 @@ import PasswordResetConfirmForm from '../components/PasswordResetConfirmForm.vue
 const router = useRouter()
 const userStore = useUserStore()
 const uiStore = useUIStore();
+
+// 跳转到Django Admin进行后台用户管理
+const goToAdmin = () => {
+    window.location.href = 'http://localhost:8000/admin'
+}
 
 const handleLoginSuccess = async () => {
     try {
@@ -99,10 +107,13 @@ const handlePasswordResetConfirmSuccess = () => {
 
 .footer {
     margin-top: 24px;
-    text-align: center;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 16px;
 }
 
 .footer .ant-btn {
-    margin: 0 8px;
+    margin: 0;
 }
 </style>

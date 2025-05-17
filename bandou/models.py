@@ -29,6 +29,25 @@ class User(AbstractUser):
         verbose_name_plural = verbose_name
 
 
+class LoginRecord(models.Model):
+    """
+    用户登录记录表
+    """
+    user = models.ForeignKey(User, on_delete=models.CASCADE, verbose_name="用户", related_name="login_records")
+    login_time = models.DateTimeField(verbose_name="登录时间", auto_now_add=True)
+    login_ip = models.GenericIPAddressField(verbose_name="登录IP", blank=True, null=True)
+
+    class Meta:
+        db_table = "login_record"
+        verbose_name = "登录记录"
+        verbose_name_plural = verbose_name
+        ordering = ['-login_time']
+
+    def __str__(self):
+        formatted_time = self.login_time.strftime("%Y-%m-%d %H:%M:%S")
+        return f"{self.user.username} - {formatted_time} - {self.login_ip}"
+
+
 class Movie(models.Model):
     """
     电影表

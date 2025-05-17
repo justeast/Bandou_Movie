@@ -30,7 +30,7 @@ from rest_framework_simplejwt.views import (
 )
 
 urlpatterns = [
-                  path("admin/", admin.site.urls),  # 超级管理员
+                  path("admin/", admin.site.urls),  # 后台用户管理
                   path("proxy_image/", proxy_bouban_movie_image),  # 获取电影图片
                   path("bandou/", include("bandou.urls")),  # 电影增删改查
                   path("movies/ranking/", MovieRankingView.as_view()),  # 电影榜单

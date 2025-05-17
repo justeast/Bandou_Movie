@@ -17,10 +17,10 @@ from rest_framework.parsers import MultiPartParser
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.exceptions import TokenError
 from rest_framework.permissions import IsAuthenticated
-from django.contrib.auth import authenticate, get_user_model
+from django.contrib.auth import get_user_model
 from bandou.utils.get_redis_instance import get_redis_instance
 from bandou.utils.user_auth import get_tokens_for_user
-from bandou.models import Movie, Rating, Comments, User
+from bandou.models import Movie, Rating, Comments, User, LoginRecord
 from bandou.serializers import MovieModelSerializer, UserModelSerializer, UserLoginSerializer, UserProfileSerializer, \
     UserAvatarUploadSerializer, UserPasswordChangeSerializer, RatingSerializer, CommentSerializer, \
     PasswordResetRequestSerializer, PasswordResetConfirmSerializer
@@ -146,20 +146,47 @@ class UserLoginView(APIView):
         username_or_email = serializer.validated_data.get('username') or serializer.validated_data.get('email')
         password = serializer.validated_data['password']
 
-        user = authenticate(username=username_or_email, password=password)
-        if user is None and '@' in username_or_email:
-            try:
-                user = User.objects.get(email=username_or_email)
-                user = authenticate(username=user.username, password=password)
-            except User.DoesNotExist:
-                return Response({"error": "该邮箱未注册！"}, status=status.HTTP_400_BAD_REQUEST)
+        # 首先尝试直接通过用户名查找用户（不使用authenticate，因为对于被封禁的用户，authenticate会直接返回None）
+        try:
+            user = User.objects.get(username=username_or_email)
+        except User.DoesNotExist:
+            # 如果不存在，尝试通过邮箱查找
+            if '@' in username_or_email:
+                try:
+                    user = User.objects.get(email=username_or_email)
+                except User.DoesNotExist:
+                    return Response({"error": "该邮箱未注册！"}, status=status.HTTP_400_BAD_REQUEST)
+            else:
+                return Response({"error": "用户名不存在！"}, status=status.HTTP_400_BAD_REQUEST)
 
-        if user is not None:
-            tokens = get_tokens_for_user(user)
-            return Response({"access": tokens["access"],
-                             "refresh": tokens["refresh"],
-                             "username": user.username}, status=status.HTTP_200_OK)
-        return Response({"error": "用户名/邮箱或密码错误！"}, status=status.HTTP_400_BAD_REQUEST)
+        # 检查用户是否被封禁
+        if not user.is_active:
+            return Response({"error": "该账号已被封禁，请联系管理员！"}, status=status.HTTP_403_FORBIDDEN)
+
+        # 检查密码是否正确
+        if not user.check_password(password):
+            return Response({"error": "密码错误！"}, status=status.HTTP_400_BAD_REQUEST)
+
+        # 手动更新用户的上次登录时间
+        user.last_login = timezone.now()
+        user.save(update_fields=['last_login'])
+
+        # 记录用户登录信息
+        x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
+        if x_forwarded_for:
+            ip = x_forwarded_for.split(',')[0]
+        else:
+            ip = request.META.get('REMOTE_ADDR')
+
+        LoginRecord.objects.create(
+            user=user,
+            login_ip=ip,
+        )
+
+        tokens = get_tokens_for_user(user)
+        return Response({"access": tokens["access"],
+                         "refresh": tokens["refresh"],
+                         "username": user.username}, status=status.HTTP_200_OK)
 
 
 class UserLogoutView(APIView):

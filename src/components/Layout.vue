@@ -109,6 +109,12 @@ Layout.vue:
                 <a-menu-item key="drama" @click="selectCategory('drama')">剧情</a-menu-item>
                 <a-menu-item key="other" @click="selectCategory('other')">其他</a-menu-item>
               </a-sub-menu>
+              <a-sub-menu key="sub3" v-if="userStore.isAdmin">
+                <template #title>
+                  <span>管理</span>
+                </template>
+                <a-menu-item key="admin-movie" @click="selectAdminMovie">电影管理</a-menu-item>
+              </a-sub-menu>
             </a-menu>
           </a-layout-sider>
           <a-layout-content :style="{ padding: '0 24px', minHeight: '600px' }" class="content-with-fixed-sider">
@@ -172,7 +178,7 @@ const selectedKeysTop = ref([])
 const selectedKeysSide = ref([])
 
 // 打开菜单管理
-const openKeys = ref(["sub1", "sub2"]);
+const openKeys = ref(["sub1", "sub2", "sub3"]);
 
 // 同步初始化路由状态
 const syncRouteState = () => {
@@ -185,14 +191,19 @@ const syncRouteState = () => {
   }
 
   // 处理顶部导航
-  const currentMenuKey = route.meta.menuKey || 'home'
+  const currentMenuKey = route.meta.topMenuKey || route.meta.menuKey || 'home';
   selectedKeysTop.value = [currentMenuKey]
 
   // 处理侧边栏
   if (route.path === '/') {
     const category = route.query.category?.toString() || 'all'
     selectedKeysSide.value = [category]
-  } else {
+  } else if (route.path === '/admin/movies') {
+    selectedKeysSide.value = ['admin-movie'];
+  } else if (route.path === '/user/profile') {
+    selectedKeysSide.value = []; // 个人中心无侧边栏高亮
+  }
+  else {
     selectedKeysSide.value = ['all']
   }
 }
@@ -205,9 +216,9 @@ const breadcrumbItems = computed(() => {
   // 处理详情页
   if (route.path.startsWith('/movie/')) {
     const from = route.query.from || 'home';
-    return from === 'ranking'
-      ? ['榜单', '详情']
-      : ['首页', '详情'];
+    if (from === 'ranking') return ['榜单', '详情'];
+    if (from === 'recommend') return ['推荐', '详情'];
+    return ['首页', '详情'];
   }
 
   // 处理首页路径
@@ -223,12 +234,9 @@ const breadcrumbItems = computed(() => {
     return items
   }
 
-  if (route.path === '/movies/recommend') {
-    return ['推荐'];
-  }
 
   // 其他页面使用meta中的配置
-  return route.meta.breadcrumb || []
+  return route.meta.breadcrumb || ['首页'];
 })
 
 const instance = getCurrentInstance()
@@ -345,6 +353,11 @@ const getMoviesByCategory = async (categoryKey) => {
 // 点击首页
 const selectHome = () => {
   router.push("/");
+};
+
+// 点击电影管理
+const selectAdminMovie = () => {
+  router.push('/admin/movies');
 };
 
 // 点击分类

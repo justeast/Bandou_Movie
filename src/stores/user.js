@@ -5,6 +5,7 @@ export const useUserStore = defineStore("user", {
   state: () => ({
     userInfo: null,
     isLoggedIn: false,
+    isAdmin: false,
   }),
   actions: {
     async fetchUserProfile() {
@@ -12,6 +13,7 @@ export const useUserStore = defineStore("user", {
         const response = await axios.get("/api/user/profile/");
         this.userInfo = response.data;
         this.isLoggedIn = true;
+        this.isAdmin = response.data.is_superuser || response.data.is_staff;
         return response.data;
       } catch (error) {
         this.clearUser();
@@ -21,6 +23,7 @@ export const useUserStore = defineStore("user", {
     clearUser() {
       this.userInfo = null;
       this.isLoggedIn = false;
+      this.isAdmin = false;
     },
     async logout() {
       try {

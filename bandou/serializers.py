@@ -65,13 +65,19 @@ class UserProfileSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = User
-        fields = ['username', 'email', 'phone', 'avatar_url', 'avatar']
+        fields = ['username', 'email', 'phone', 'avatar_url', 'avatar', 'is_staff', 'is_superuser']
         extra_kwargs = {
             'phone': {
                 'required': False
             },
             'avatar': {
                 'write_only': True
+            },
+            'is_staff': {
+                'read_only': True
+            },
+            'is_superuser': {
+                'read_only': True
             }
         }
 

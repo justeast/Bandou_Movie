@@ -1,22 +1,25 @@
 from datetime import timedelta
 import requests
 import random
+
 from django.http import HttpResponse
 from django.conf import settings
 from django.core.mail import send_mail
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 from django.shortcuts import get_object_or_404
+from rest_framework.decorators import action
+from rest_framework.pagination import PageNumberPagination
 from rest_framework.views import APIView
 from rest_framework.viewsets import ModelViewSet
 from rest_framework.filters import SearchFilter, OrderingFilter
 from rest_framework.response import Response
 from django.db.models import Value, Case, When, FloatField, Avg, Count, Q
 from rest_framework import generics, status
-from rest_framework.parsers import MultiPartParser
+from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.exceptions import TokenError
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, IsAdminUser
 from django.contrib.auth import get_user_model
 from bandou.utils.get_redis_instance import get_redis_instance
 from bandou.utils.user_auth import get_tokens_for_user
@@ -551,3 +554,132 @@ class MovieRecommendationView(APIView):
     def get_anonymous_recommendations(self):
         """为匿名用户生成推荐"""
         return self.get_top_rated_by_category()
+
+
+class StandardResultsSetPagination(PageNumberPagination):
+    page_size = 10
+    page_size_query_param = 'page_size'
+    max_page_size = 100
+
+
+class AdminMovieViewSet(ModelViewSet):
+    """
+    后台电影管理视图集
+    提供电影的增删改查功能和数据统计功能
+    """
+    queryset = Movie.objects.all()
+    serializer_class = MovieModelSerializer
+    permission_classes = [IsAdminUser]  # 限制只有管理员才能访问
+    parser_classes = [MultiPartParser, FormParser]  # 支持文件上传
+    pagination_class = StandardResultsSetPagination
+
+    # 自定义的过滤、搜索和排序功能
+    filter_backends = [SearchFilter, OrderingFilter]
+    search_fields = ["title", "director", "type", "starring"]
+    ordering_fields = ["id", "score", "release_time"]
+
+    @action(detail=False, methods=['post'])
+    def bulk_delete(self, request):
+        """批量删除电影"""
+        ids = request.data.get('ids', [])
+        if not ids:
+            return Response({"error": "未提供要删除的电影ID"}, status=status.HTTP_400_BAD_REQUEST)
+
+        deleted_count, _ = Movie.objects.filter(id__in=ids).delete()
+        return Response({"message": f"成功删除{deleted_count}部电影"}, status=status.HTTP_200_OK)
+
+    @action(detail=False, methods=['get'])
+    def category_stats(self, request):
+        """获取各分类电影数量统计"""
+        stats = Movie.objects.values('type').annotate(count=Count('id')).order_by('-count')
+
+        # 处理多类型电影（如"动作/喜剧"）
+        categories = {}
+        for item in stats:
+            movie_type = item['type']
+            count = item['count']
+
+            # 处理包含多个类型的情况
+            if '/' in movie_type:
+                types = movie_type.split('/')
+                for t in types:
+                    t = t.strip()
+                    if t in categories:
+                        categories[t] += count
+                    else:
+                        categories[t] = count
+            else:
+                if movie_type in categories:
+                    categories[movie_type] += count
+                else:
+                    categories[movie_type] = count
+
+        # 转换为前端所需格式
+        result = [{"category": k, "count": v} for k, v in categories.items()]
+        return Response(result)
+
+    @action(detail=False, methods=['get'])
+    def rating_distribution(self, request):
+        """各分类电影不同分数段占比"""
+        # 定义分数段
+        ranges = [
+            (0, 1), (1, 2), (2, 3), (3, 4), (4, 5)
+        ]
+
+        result = []
+        categories = set()
+
+        # 获取所有出现的电影类型
+        for movie in Movie.objects.all():
+            if '/' in movie.type:
+                for t in movie.type.split('/'):
+                    categories.add(t.strip())
+            else:
+                categories.add(movie.type)
+
+        # 为每个类别计算分数分布
+        for category in categories:
+            distribution = []
+
+            # 获取该类别的所有电影
+            movies = Movie.objects.filter(type__contains=category)
+
+            for start, end in ranges:
+                count = movies.filter(score__gte=start, score__lt=end).count()
+                distribution.append({
+                    "range": f"{start}-{end}",
+                    "count": count
+                })
+
+            result.append({
+                "category": category,
+                "distribution": distribution
+            })
+
+        return Response(result)
+
+    @action(detail=True, methods=['get'])
+    def rating_trend(self, request, pk=None):
+        """获取特定电影的评分趋势"""
+        movie = self.get_object()
+
+        # 获取最近30天每天的平均评分
+        end_date = timezone.now()
+        start_date = end_date - timedelta(days=30)
+
+        # 按日期分组获取评分
+        daily_ratings = Rating.objects.filter(
+            movie=movie,
+            rating_time__gte=start_date,
+            rating_time__lte=end_date
+        ).extra(
+            select={'date': "DATE(rating_time)"}
+        ).values('date').annotate(avg_rating=Avg('rating')).order_by('date')
+
+        # 格式化结果
+        trend_data = [
+            {"date": item['date'].strftime('%Y-%m-%d'), "avg_rating": float(item['avg_rating'])}
+            for item in daily_ratings
+        ]
+
+        return Response(trend_data)

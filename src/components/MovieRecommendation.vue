@@ -109,6 +109,14 @@ try {
 // 图片缓存处理
 const cachedImage = (url) => {
     if (!url) return DEFAULT_IMAGE; // 无 URL 时返回默认图片
+
+    // 检查是否是本地上传的图片（以/media/开头）
+    if (url.startsWith('/media/')) {
+        // 本地图片直接返回完整URL
+        return `http://127.0.0.1:8000${url}`;
+    }
+
+    // 外部图片使用缓存和代理
     if (imageCache.value[url]) return imageCache.value[url]; // 返回缓存的 URL
 
     // 缓存代理 URL

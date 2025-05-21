@@ -150,6 +150,15 @@ const imageCache = ref(JSON.parse(localStorage.getItem("imageCache")) || {});
 
 // 处理图片 URL
 const cachedImage = (url) => {
+    if (!url) return '';
+
+    // 检查是否是本地图片路径（以/media/开头）
+    if (url.startsWith('/media/')) {
+        // 本地图片直接返回完整URL
+        return `http://127.0.0.1:8000${url}`;
+    }
+
+    // 外部图片使用代理
     if (!imageCache.value[url]) {
         const proxyUrl = `http://127.0.0.1:8000/proxy_image/?url=${encodeURIComponent(url)}`;
         imageCache.value[url] = proxyUrl;

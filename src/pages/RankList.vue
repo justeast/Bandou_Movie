@@ -72,7 +72,13 @@ const CACHE_TTL = 5 * 60 * 1000; // 5分钟缓存
 const getProxyImageUrl = (originalUrl) => {
     if (!originalUrl) return defaultCover;
 
-    // 图片URL缓存（内存缓存）
+    // 检查是否是本地图片路径（以/media/开头）
+    if (originalUrl.startsWith('/media/')) {
+        // 本地图片直接返回完整URL
+        return `http://127.0.0.1:8000${originalUrl}`;
+    }
+
+    // 外部图片使用代理和缓存
     const cacheKey = `image:${originalUrl}`;
     const cached = sessionStorage.getItem(cacheKey);
     if (cached) return cached;

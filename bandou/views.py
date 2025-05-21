@@ -1,4 +1,4 @@
-import os
+import urllib.parse
 from datetime import timedelta
 import requests
 import random
@@ -20,6 +20,7 @@ from rest_framework.viewsets import ModelViewSet
 from rest_framework.filters import SearchFilter, OrderingFilter
 from rest_framework.response import Response
 from django.db.models import Value, Case, When, FloatField, Avg, Count, Q
+from django.core.files.storage import default_storage
 from rest_framework import generics, status
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from rest_framework_simplejwt.tokens import RefreshToken
@@ -656,22 +657,24 @@ class AdminMovieViewSet(ModelViewSet):
             return queryset.order_by(ordering_field)
 
     def _delete_cover_file(self, cover_url):  # noqa
-        """删除封面文件"""
+        """从OSS中删除封面文件"""
         if not cover_url:
             return
 
-        # 从URL中提取文件路径 /media/covers/movie_1_1621234567.jpg -> covers/movie_1_1621234567.jpg
-        if cover_url.startswith(settings.MEDIA_URL):
-            relative_path = cover_url[len(settings.MEDIA_URL):]
-            file_path = os.path.join(settings.MEDIA_ROOT, relative_path)
+        # 初始化path变量，避免未定义警告
+        path = None
 
-            # 删除文件
-            if os.path.isfile(file_path):
-                try:
-                    os.remove(file_path)
-                    logger.info(f"已删除文件: {file_path}")
-                except (OSError, IOError) as e:
-                    logger.error(f"删除文件失败: {file_path}, 错误: {str(e)}")
+        try:
+            # 从URL中提取文件路径
+            # 实际OSS URL格式: https://bandou-movie.oss-cn-guangzhou.aliyuncs.com/media/covers/movie_122_1747822938.png
+            parsed_url = urllib.parse.urlparse(cover_url)
+            path = parsed_url.path
+            if path.startswith('/media/'):
+                alt_path = path[7:]  # 去掉'/media/'
+                default_storage.delete(alt_path)
+                logger.info(f"已从OSS删除文件: {alt_path}")
+        except Exception as e:
+            logger.error(f"删除OSS文件失败: {cover_url}, 路径: {path}, 错误: {str(e)}")
 
     def perform_destroy(self, instance):
         """

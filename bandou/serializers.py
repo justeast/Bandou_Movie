@@ -1,6 +1,6 @@
+import urllib.parse
 from datetime import timedelta
 
-from django.conf import settings
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
 from django.contrib.auth.hashers import make_password
@@ -12,6 +12,14 @@ import time
 from bandou.models import Movie, User, Rating, Comments
 from bandou.utils.get_redis_instance import get_redis_instance
 from bandou.utils.validate_image_file import validate_image_file
+
+# 使用Django的默认存储后端（已配置为OSS）
+from django.core.files.storage import default_storage
+from django.core.files.base import ContentFile
+
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class MovieModelSerializer(serializers.ModelSerializer):
@@ -67,42 +75,40 @@ class MovieModelSerializer(serializers.ModelSerializer):
         return instance
 
     def _handle_cover_upload(self, movie, cover_file):  # noqa
-        """处理电影封面上传"""
-        # 使用 covers 作为目录
-        upload_dir = os.path.join(settings.MEDIA_ROOT, 'covers')
-        os.makedirs(upload_dir, exist_ok=True)
-
+        """处理电影封面上传到阿里云OSS"""
         # 生成文件名
         ext = os.path.splitext(cover_file.name)[1]
-        filename = f"movie_{movie.id}_{int(time.time())}{ext}"
-        file_path = os.path.join(upload_dir, filename)
+        filename = f"covers/movie_{movie.id}_{int(time.time())}{ext}"
 
-        # 保存文件
-        with open(file_path, 'wb+') as destination:
-            for chunk in cover_file.chunks():
-                destination.write(chunk)
+        # 将文件保存到OSS
+        path = default_storage.save(filename, ContentFile(cover_file.read()))
+
+        # 获取文件的完整URL
+        url = default_storage.url(path)
 
         # 更新cover_url
-        relative_path = f"covers/{filename}"
-        movie.cover_url = f"{settings.MEDIA_URL.rstrip('/')}/{relative_path}"
+        movie.cover_url = url
         movie.save(update_fields=['cover_url'])
 
     def _delete_cover_file(self, cover_url):  # noqa
-        """删除封面文件"""
+        """从OSS中删除封面文件"""
         if not cover_url:
             return
 
-        # 从URL中提取文件路径
-        if cover_url.startswith(settings.MEDIA_URL):
-            relative_path = cover_url[len(settings.MEDIA_URL):]
-            file_path = os.path.join(settings.MEDIA_ROOT, relative_path)
+        # 初始化path变量，避免未定义警告
+        path = None
 
-            # 删除文件
-            if os.path.isfile(file_path):
-                try:
-                    os.remove(file_path)
-                except (OSError, IOError) as e:
-                    print(f"删除旧封面文件失败: {file_path}, 错误: {str(e)}")
+        try:
+            # 从URL中提取文件路径
+            # 实际OSS URL格式: https://bandou-movie.oss-cn-guangzhou.aliyuncs.com/media/covers/movie_122_1747822938.png
+            parsed_url = urllib.parse.urlparse(cover_url)
+            path = parsed_url.path
+            if path.startswith('/media/'):
+                alt_path = path[7:]  # 去掉'/media/'
+                default_storage.delete(alt_path)
+        except Exception as e:
+            logger.error(
+                f"删除OSS文件失败: {cover_url}, 路径: {path}, 错误: {str(e)}")
 
 
 class UserModelSerializer(serializers.ModelSerializer):
@@ -202,13 +208,13 @@ class UserAvatarUploadSerializer(serializers.ModelSerializer):
         if avatar_file:
             # 删除旧文件
             if instance.avatar:
-                instance.avatar.delete()
+                instance.avatar.delete()  # ImageField的delete方法会自动处理存储后端
 
-            # 生成新文件名
+            # 生成新文件名，确保路径包含avatars/前缀
             ext = os.path.splitext(avatar_file.name)[1]
             new_name = f"user_{instance.id}_{int(time.time())}{ext}"
 
-            # 保存文件
+            # 保存文件 - 这会自动使用配置的存储后端（OSS）
             instance.avatar.save(new_name, avatar_file)
 
         return instance

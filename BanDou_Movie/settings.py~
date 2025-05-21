@@ -176,9 +176,9 @@ OSS_ENDPOINT = os.getenv('ALIYUN_OSS_ENDPOINT')
 # 设置文件存储后端
 STORAGES = {
     "default": {
-        "BACKEND": "django_oss_storage.backends.OssMediaStorage", # oss
+        "BACKEND": "django_oss_storage.backends.OssMediaStorage",
     },
     "staticfiles": {
-        "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage", # django默认(修改会导致Admin界面样式丢失)
+        "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
     },
 }

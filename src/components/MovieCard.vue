@@ -41,6 +41,12 @@ const imageCache = ref(JSON.parse(localStorage.getItem("imageCache")) || {});
 const cachedImage = (url) => {
     if (!url) return '';
 
+    // 检查是否是阿里云OSS的URL（包含aliyuncs.com或其他OSS域名）
+    if (url.includes('aliyuncs.com') || url.includes('oss-cn-')) {
+        // 阿里云OSS图片直接返回原URL，无需代理
+        return url;
+    }
+
     // 检查是否是本地图片路径（以/media/开头）
     if (url.startsWith('/media/')) {
         // 本地图片直接返回完整URL

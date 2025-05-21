@@ -72,6 +72,12 @@ const CACHE_TTL = 5 * 60 * 1000; // 5分钟缓存
 const getProxyImageUrl = (originalUrl) => {
     if (!originalUrl) return defaultCover;
 
+    // 检查是否是阿里云OSS的URL（包含aliyuncs.com或其他OSS域名）
+    if (originalUrl.includes('aliyuncs.com') || originalUrl.includes('oss-cn-')) {
+        // 阿里云OSS图片直接返回原URL，无需代理
+        return originalUrl;
+    }
+
     // 检查是否是本地图片路径（以/media/开头）
     if (originalUrl.startsWith('/media/')) {
         // 本地图片直接返回完整URL

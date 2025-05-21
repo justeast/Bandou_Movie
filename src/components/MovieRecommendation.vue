@@ -110,6 +110,12 @@ try {
 const cachedImage = (url) => {
     if (!url) return DEFAULT_IMAGE; // 无 URL 时返回默认图片
 
+    // 检查是否是阿里云OSS的URL（包含aliyuncs.com或其他OSS域名）
+    if (url.includes('aliyuncs.com') || url.includes('oss-cn-')) {
+        // 阿里云OSS图片直接返回原URL，无需代理
+        return url;
+    }
+
     // 检查是否是本地上传的图片（以/media/开头）
     if (url.startsWith('/media/')) {
         // 本地图片直接返回完整URL

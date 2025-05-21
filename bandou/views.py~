@@ -807,10 +807,10 @@ class AdminMovieViewSet(ModelViewSet):
             rating_time__gte=start_date,
             rating_time__lte=end_date
         ).extra(
-            select={'date': "DATE(rating_time)"}  # 提取评分时间的日期部分
+            select={'date': "DATE(rating_time)"}
         ).values('date').annotate(avg_rating=Avg('rating')).order_by('date')
 
-        # 将查询结果转换为字典(将日期对象转换为字符串格式（'YYYY-MM-DD'）作为字典的键,将平均评分转换为浮点数作为字典的值)
+        # 将查询结果转换为字典
         ratings_dict = {
             item['date'].strftime('%Y-%m-%d'): float(item['avg_rating'])
             for item in daily_ratings

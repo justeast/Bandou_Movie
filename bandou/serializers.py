@@ -1,4 +1,6 @@
 from datetime import timedelta
+
+from django.conf import settings
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
 from django.contrib.auth.hashers import make_password
@@ -9,12 +11,98 @@ import os
 import time
 from bandou.models import Movie, User, Rating, Comments
 from bandou.utils.get_redis_instance import get_redis_instance
+from bandou.utils.validate_image_file import validate_image_file
 
 
 class MovieModelSerializer(serializers.ModelSerializer):
+    # 添加临时字段用于接收文件上传
+    cover = serializers.ImageField(write_only=True, required=False)
+    cover_url = serializers.CharField(max_length=255, required=False)
+
     class Meta:
         model = Movie
         fields = "__all__"
+
+    def validate_cover(self, value):  # noqa
+        """电影封面图片文件校验"""
+        return validate_image_file(value)
+
+    def create(self, validated_data):
+        # 提取封面文件
+        cover_file = validated_data.pop('cover', None)
+
+        # 只有当没有封面文件时才检查cover_url
+        if not cover_file and 'cover_url' not in validated_data:
+            raise serializers.ValidationError({'cover_url': ['请上传封面图片！']})
+
+        # 创建电影记录
+        movie = Movie.objects.create(**validated_data)
+
+        # 处理封面图片上传
+        if cover_file:
+            self._handle_cover_upload(movie, cover_file)
+
+        return movie
+
+    def update(self, instance, validated_data):
+        # 提取封面文件
+        cover_file = validated_data.pop('cover', None)
+
+        # 保存旧的封面URL，用于后续删除
+        old_cover_url = instance.cover_url if cover_file else None
+
+        # 更新其他字段
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+
+        # 处理封面图片上传
+        if cover_file:
+            self._handle_cover_upload(instance, cover_file)
+
+            # 删除旧的封面文件
+            if old_cover_url:
+                self._delete_cover_file(old_cover_url)
+
+        instance.save()
+        return instance
+
+    def _handle_cover_upload(self, movie, cover_file):  # noqa
+        """处理电影封面上传"""
+        # 使用 covers 作为目录
+        upload_dir = os.path.join(settings.MEDIA_ROOT, 'covers')
+        os.makedirs(upload_dir, exist_ok=True)
+
+        # 生成文件名
+        ext = os.path.splitext(cover_file.name)[1]
+        filename = f"movie_{movie.id}_{int(time.time())}{ext}"
+        file_path = os.path.join(upload_dir, filename)
+
+        # 保存文件
+        with open(file_path, 'wb+') as destination:
+            for chunk in cover_file.chunks():
+                destination.write(chunk)
+
+        # 更新cover_url
+        relative_path = f"covers/{filename}"
+        movie.cover_url = f"{settings.MEDIA_URL.rstrip('/')}/{relative_path}"
+        movie.save(update_fields=['cover_url'])
+
+    def _delete_cover_file(self, cover_url):  # noqa
+        """删除封面文件"""
+        if not cover_url:
+            return
+
+        # 从URL中提取文件路径
+        if cover_url.startswith(settings.MEDIA_URL):
+            relative_path = cover_url[len(settings.MEDIA_URL):]
+            file_path = os.path.join(settings.MEDIA_ROOT, relative_path)
+
+            # 删除文件
+            if os.path.isfile(file_path):
+                try:
+                    os.remove(file_path)
+                except (OSError, IOError) as e:
+                    print(f"删除旧封面文件失败: {file_path}, 错误: {str(e)}")
 
 
 class UserModelSerializer(serializers.ModelSerializer):
@@ -106,19 +194,7 @@ class UserAvatarUploadSerializer(serializers.ModelSerializer):
 
     def validate_avatar(self, value):  # noqa
         """用户头像上传图片文件校验"""
-        if not value:
-            return None
-
-        valid_extensions = ['jpg', 'jpeg', 'png']  # 限制文件类型
-        extension = value.name.split('.')[-1].lower()
-        if extension not in valid_extensions:
-            raise ValidationError(f"不支持的文件格式，仅支持 {', '.join(valid_extensions)}")
-
-        max_size = 5 * 1024 * 1024  # 限制文件大小 (5MB)
-        if value.size > max_size:
-            raise ValidationError(f"文件大小超过限制（最大 {max_size // 1024 // 1024}MB）")
-
-        return value
+        return validate_image_file(value)
 
     def update(self, instance, validated_data):
         avatar_file = validated_data.get('avatar')
